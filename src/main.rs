@@ -17,6 +17,7 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(player::handle_input)
                 .with_system(player::update_controllable_velocities.after(player::handle_input))
+                .with_system(player::update_player_attack_state)
                 .with_system(
                     player::update_player_state_and_direction
                         .after(player::update_controllable_velocities),

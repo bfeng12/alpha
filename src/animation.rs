@@ -11,7 +11,7 @@ pub enum AnimationMode {
     Repeating,
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub enum AnimationState {
     #[default]
     Playing,
@@ -34,6 +34,7 @@ impl Animation {
         self.end - self.start
     }
 
+    // this assumes that all frames have the same duration, i.e. consistent frame rate
     pub fn new(
         seconds_per_frame: f32,
         start: usize,
@@ -51,6 +52,11 @@ impl Animation {
             current_frame: 0,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.state = AnimationState::Playing;
+        self.current_frame = 0;
+    }
 }
 
 pub fn animate_sprites(
@@ -67,7 +73,7 @@ pub fn animate_sprites(
                         AnimationMode::Once => {
                             animation.current_frame += 1;
                             sprite.index = animation.start + animation.current_frame;
-                            if sprite.index == animation.end - 1 {
+                            if animation.current_frame == animation.len() - 1 {
                                 animation.state = AnimationState::Finished;
                             }
                         }

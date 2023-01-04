@@ -27,6 +27,7 @@ pub struct Controls {
     down: bool,
     left: bool,
     right: bool,
+    attack: bool,
 }
 
 #[derive(Component, Default, PartialEq)]
@@ -71,6 +72,7 @@ pub fn handle_animation_state_update(
     >,
 ) {
     for (mut animation, state, direction, mut sprite) in query.iter_mut() {
+        animation.reset();
         match (state, direction) {
             (PlayerState::Idle, Direction::Up) => {
                 animation.start = PLAYER_IDLE_UP_ROW_INDEX * PLAYER_ANIMATION_LENGTH;
@@ -128,7 +130,38 @@ pub fn handle_animation_state_update(
                 sprite.flip_x = false;
                 sprite.index = animation.start;
             }
-            (PlayerState::Attacking, ..) => (),
+            (PlayerState::Attacking, Direction::Up) => {
+                animation.start = 48;
+                animation.end = 52;
+                animation.flip_x = false;
+                animation.play_mode = animation::AnimationMode::Once;
+                sprite.flip_x = false;
+                sprite.index = animation.start;
+            }
+            (PlayerState::Attacking, Direction::Down) => {
+                animation.start = 36;
+                animation.end = 40;
+                animation.flip_x = false;
+                animation.play_mode = animation::AnimationMode::Once;
+                sprite.flip_x = false;
+                sprite.index = animation.start;
+            }
+            (PlayerState::Attacking, Direction::Left) => {
+                animation.start = 42;
+                animation.end = 46;
+                animation.flip_x = true;
+                animation.play_mode = animation::AnimationMode::Once;
+                sprite.flip_x = true;
+                sprite.index = animation.start;
+            }
+            (PlayerState::Attacking, Direction::Right) => {
+                animation.start = 42;
+                animation.end = 46;
+                animation.flip_x = false;
+                animation.play_mode = animation::AnimationMode::Once;
+                sprite.flip_x = false;
+                sprite.index = animation.start;
+            }
             (PlayerState::Dead, ..) => (),
         }
     }
@@ -190,25 +223,32 @@ pub fn handle_input(keyboard_input: Res<Input<KeyCode>>, mut query: Query<&mut C
         controls.left = keyboard_input.pressed(KeyCode::A);
         controls.down = keyboard_input.pressed(KeyCode::S);
         controls.right = keyboard_input.pressed(KeyCode::D);
+        controls.attack = keyboard_input.pressed(KeyCode::Space);
     }
 }
 
-pub fn update_controllable_velocities(mut query: Query<(&Controls, &mut Velocity)>) {
-    for (controls, mut velocity) in query.iter_mut() {
-        if controls.up && !controls.down {
-            velocity.0.y = 1.0;
-        } else if controls.down && !controls.up {
-            velocity.0.y = -1.0;
+pub fn update_controllable_velocities(
+    mut query: Query<(&Controls, &mut Velocity, Option<&PlayerState>)>,
+) {
+    for (controls, mut velocity, player_state) in query.iter_mut() {
+        if let Some(PlayerState::Attacking) = player_state {
+            velocity.0 = Vec2::ZERO;
         } else {
-            velocity.0.y = 0.0;
-        }
+            if controls.up && !controls.down {
+                velocity.0.y = 1.0;
+            } else if controls.down && !controls.up {
+                velocity.0.y = -1.0;
+            } else {
+                velocity.0.y = 0.0;
+            }
 
-        if controls.left && !controls.right {
-            velocity.0.x = -1.0;
-        } else if controls.right && !controls.left {
-            velocity.0.x = 1.0;
-        } else {
-            velocity.0.x = 0.0;
+            if controls.left && !controls.right {
+                velocity.0.x = -1.0;
+            } else if controls.right && !controls.left {
+                velocity.0.x = 1.0;
+            } else {
+                velocity.0.x = 0.0;
+            }
         }
     }
 }
@@ -222,5 +262,29 @@ pub fn move_entities(mut query: Query<(&mut Transform, &Velocity)>) {
         let new_position = transform.translation + Vec3::new(x, y, 0.0) * 500.0 * TIME_STEP;
 
         transform.translation = new_position;
+    }
+}
+
+pub fn update_player_attack_state(
+    mut query: Query<(&mut PlayerState, &mut animation::Animation, &Controls)>,
+) {
+    let (mut player_state, mut animation, controls) = query.single_mut();
+
+    match *player_state {
+        PlayerState::Idle | PlayerState::Walking => {
+            if controls.attack {
+                *player_state = PlayerState::Attacking;
+            }
+        }
+        PlayerState::Attacking => {
+            if animation.state == animation::AnimationState::Finished {
+                if controls.attack {
+                    animation.reset();
+                } else {
+                    *player_state = PlayerState::Idle;
+                }
+            }
+        }
+        PlayerState::Dead => (),
     }
 }
